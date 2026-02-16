@@ -35,6 +35,32 @@ class GradeEnvironment : public testing::Environment
 };
 */
 
+TEST (load_process_control_blocks, CorrectFilename) 
+{
+	const char *query_filename = "pcb.bin"; 
+	dyn_array_t *array = load_process_control_blocks(query_filename); 
+
+	ASSERT_NE(array, nullptr); 
+	ASSERT_E(dyn_array_size(array), (size_t)4);
+
+	// Verify each element
+	for (size_t i = 0; i < dyn_array_size(array); ++i) 
+	{
+		ProcessControlBlock_t *block = (ProcessControlBlock_t *)dyn_array_at(array, i);
+
+		ASSERT_NE(block, nullptr);
+		ASSERT_EQ(block->started, false);
+	}
+}
+
+TEST (load_process_control_blocks, IncorrectFilename)
+{
+	const char *query_filename = "";
+
+	dyn_array_t *array = load_process_control_blocks(query_filename);
+
+	ASSERT_EQ(array, nullptr);
+}
 
 int main(int argc, char **argv)
 {

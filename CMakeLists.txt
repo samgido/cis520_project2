@@ -31,3 +31,6 @@ target_compile_definitions(${PROJECT_NAME}_test PRIVATE)
 
 # Link ${PROJECT_NAME}_test with dyn_array and gtest and pthread libraries
 target_link_libraries(${PROJECT_NAME}_test gtest pthread dyn_array)
+
+# Put pcb.bin into build for convenience 
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/pcb.bin" "${CMAKE_CURRENT_BINARY_DIR}/pcb.bin" COPYONLY)

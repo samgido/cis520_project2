@@ -70,6 +70,8 @@
 	// There is no guarantee that the passed dyn_array_t will be the result of your implementation of load_process_control_blocks
 	bool shortest_remaining_time_first(dyn_array_t *ready_queue, ScheduleResult_t *result);
 
+	void process_control_block_destruct(void *element);
+
 #ifdef __cplusplus
 }
 #endif
