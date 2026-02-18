@@ -19,7 +19,7 @@ include_directories(include)
 add_library(dyn_array src/dyn_array.c)
 
 # Compile the analysis executable
-add_executable(analysis src/analysis.c)
+add_executable(analysis src/analysis.c src/process_scheduling.c)
 
 # link the dyn_array library we compiled against our analysis executable
 target_link_libraries(analysis dyn_array)

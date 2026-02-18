@@ -41,7 +41,7 @@ TEST (load_process_control_blocks, CorrectFilename)
 	dyn_array_t *array = load_process_control_blocks(query_filename); 
 
 	ASSERT_NE(array, nullptr); 
-	ASSERT_E(dyn_array_size(array), (size_t)4);
+	ASSERT_EQ(dyn_array_size(array), (size_t)4);
 
 	// Verify each element
 	for (size_t i = 0; i < dyn_array_size(array); ++i) 
@@ -51,6 +51,8 @@ TEST (load_process_control_blocks, CorrectFilename)
 		ASSERT_NE(block, nullptr);
 		ASSERT_EQ(block->started, false);
 	}
+
+	dyn_array_destroy(array);
 }
 
 TEST (load_process_control_blocks, IncorrectFilename)
@@ -60,6 +62,58 @@ TEST (load_process_control_blocks, IncorrectFilename)
 	dyn_array_t *array = load_process_control_blocks(query_filename);
 
 	ASSERT_EQ(array, nullptr);
+}
+
+// FCFS Test 1: Verify correct scheduling with a known set of processes
+TEST (first_come_first_serve, ValidProcesses)
+{
+	// Create 3 processes: (burst = 5, arrival = 0), (burst = 3, arrival = 1), (burst = 8, arrival = 2)
+	// Expected timeline:
+	//   t = 0-5:  P0 runs (wait = 0, turnaround = 5)
+	//   t = 5-8:  P1 runs (wait = 4, turnaround = 7)
+	//   t = 8-16: P2 runs (wait = 6, turnaround = 14)
+	// Avg wait = (0+4+6)/3 = 3.33, Avg turnaround = (5+7+14)/3 = 8.67, Total = 16
+
+	dyn_array_t *ready_queue = dyn_array_create(3, sizeof(ProcessControlBlock_t), NULL);
+	ASSERT_NE(ready_queue, nullptr);
+
+	ProcessControlBlock_t pcbs[3] = {
+		{5, 0, 0, false},
+		{3, 0, 1, false},
+		{8, 0, 2, false}
+	};
+
+	dyn_array_push_back(ready_queue, &pcbs[0]);
+	dyn_array_push_back(ready_queue, &pcbs[1]);
+	dyn_array_push_back(ready_queue, &pcbs[2]);
+
+	ScheduleResult_t result;
+	bool success = first_come_first_serve(ready_queue, &result);
+
+	ASSERT_EQ(success, true);
+	EXPECT_NEAR(result.average_waiting_time, 3.33f, 0.1f);
+	EXPECT_NEAR(result.average_turnaround_time, 8.67f, 0.1f);
+	EXPECT_EQ(result.total_run_time, (unsigned long)16);
+
+	dyn_array_destroy(ready_queue);
+}
+
+// FCFS Test 2: Verify that FCFS handles NULL inputs gracefully
+TEST (first_come_first_serve, NullInputs)
+{
+	ScheduleResult_t result;
+	dyn_array_t *ready_queue = dyn_array_create(3, sizeof(ProcessControlBlock_t), NULL);
+
+	// Both NULL
+	ASSERT_EQ(first_come_first_serve(NULL, NULL), false);
+
+	// NULL queue
+	ASSERT_EQ(first_come_first_serve(NULL, &result), false);
+
+	// NULL result
+	ASSERT_EQ(first_come_first_serve(ready_queue, NULL), false);
+
+	dyn_array_destroy(ready_queue);
 }
 
 int main(int argc, char **argv)
