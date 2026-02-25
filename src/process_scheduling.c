@@ -107,10 +107,66 @@ bool priority(dyn_array_t *ready_queue, ScheduleResult_t *result)
 
 bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quantum) 
 {
-	UNUSED(ready_queue);
-	UNUSED(result);
-	UNUSED(quantum);
-	return false;
+	if (!ready_queue || !result || quantum == 0)
+		return false;
+
+	size_t n = dyn_array_size(ready_queue);
+	if (n == 0)
+		return false;
+
+	unsigned long clock = 0;
+	size_t completed = 0;
+
+	float total_wait_time = 0;
+	float total_turnaround_time = 0;
+
+	while (completed < n)
+	{
+		bool progress_made = false;
+
+		for (size_t i = 0; i < n; i++)
+		{
+			ProcessControlBlock_t* pcb = dyn_array_at(ready_queue, i);
+			if (!pcb)
+				return false;
+
+			if (pcb->remaining_burst_time > 0 && pcb->arrival <= clock)
+			{
+				progress_made = true;
+
+				if (!pcb->started)
+				{
+					total_wait_time += (float)(clock - pcb->arrival);
+					pcb->started = true;
+				}
+
+				size_t time_slice = 0;
+
+				while (time_slice < quantum && pcb->remaining_burst_time > 0)
+				{
+					virtual_cpu(pcb);
+					clock++;
+					time_slice++;
+				}
+
+				if (pcb->remaining_burst_time == 0)
+				{
+					completed++;
+					total_turnaround_time += (float)(clock - pcb->arrival);
+				}
+			}
+		}
+
+		// If no process was ready, advance clock
+		if (!progress_made)
+			clock++;
+	}
+
+	result->average_waiting_time = total_wait_time / (float)n;
+	result->average_turnaround_time = total_turnaround_time / (float)n;
+	result->total_run_time = clock;
+
+	return true;
 }
 
 dyn_array_t *load_process_control_blocks(const char *input_file) 
@@ -178,9 +234,71 @@ dyn_array_t *load_process_control_blocks(const char *input_file)
 
 bool shortest_remaining_time_first(dyn_array_t *ready_queue, ScheduleResult_t *result) 
 {
-	UNUSED(ready_queue);
-	UNUSED(result);
-	return false;
+	if (!ready_queue || !result)
+		return false;
+
+	size_t n = dyn_array_size(ready_queue);
+	if (n == 0)
+		return false;
+
+	unsigned long clock = 0;
+	size_t completed = 0;
+
+	float total_wait_time = 0;
+	float total_turnaround_time = 0;
+
+	while (completed < n)
+	{
+		ProcessControlBlock_t* shortest = NULL;
+
+		// Find process with smallest remaining time among the current processes
+		for (size_t i = 0; i < n; i++)
+		{
+			ProcessControlBlock_t* pcb = dyn_array_at(ready_queue, i);
+			if (!pcb)
+				return false;
+
+			if (pcb->arrival <= clock && pcb->remaining_burst_time > 0)
+			{
+				if (!shortest ||
+					pcb->remaining_burst_time < shortest->remaining_burst_time)
+				{
+					shortest = pcb;
+				}
+			}
+		}
+
+		// If no process is ready advance clock
+		if (!shortest)
+		{
+			clock++;
+			continue;
+		}
+
+		// First time scheduled: compute waiting time
+		if (!shortest->started)
+		{
+			total_wait_time += (float)(clock - shortest->arrival);
+			shortest->started = true;
+		}
+
+		// Run for 1 time unit
+		virtual_cpu(shortest);
+		clock++;
+
+		// If finished
+		if (shortest->remaining_burst_time == 0)
+		{
+			completed++;
+			total_turnaround_time += (float)(clock - shortest->arrival);
+		}
+	}
+
+	result->average_waiting_time = total_wait_time / (float)n;
+	result->average_turnaround_time = total_turnaround_time / (float)n;
+	result->total_run_time = clock;
+
+	return true;
 }
 
 void process_control_block_destruct(void *element) 
