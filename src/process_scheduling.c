@@ -247,16 +247,28 @@ bool shortest_remaining_time_first(dyn_array_t *ready_queue, ScheduleResult_t *r
 	float total_wait_time = 0;
 	float total_turnaround_time = 0;
 
+	unsigned long* original_bursts = malloc(sizeof(unsigned long) * n);
+	if (!original_bursts) return false;
+
+	for (size_t i = 0; i < n; i++)
+	{
+		ProcessControlBlock_t* pcb = dyn_array_at(ready_queue, i);
+		original_bursts[i] = pcb->remaining_burst_time;
+	}
+
 	while (completed < n)
 	{
 		ProcessControlBlock_t* shortest = NULL;
+		size_t shortest_index = 0;
 
 		// Find process with smallest remaining time among the current processes
 		for (size_t i = 0; i < n; i++)
 		{
 			ProcessControlBlock_t* pcb = dyn_array_at(ready_queue, i);
-			if (!pcb)
+			if (!pcb) {
+				free(original_bursts);
 				return false;
+			}
 
 			if (pcb->arrival <= clock && pcb->remaining_burst_time > 0)
 			{
@@ -264,6 +276,7 @@ bool shortest_remaining_time_first(dyn_array_t *ready_queue, ScheduleResult_t *r
 					pcb->remaining_burst_time < shortest->remaining_burst_time)
 				{
 					shortest = pcb;
+					shortest_index = i;
 				}
 			}
 		}
@@ -290,7 +303,11 @@ bool shortest_remaining_time_first(dyn_array_t *ready_queue, ScheduleResult_t *r
 		if (shortest->remaining_burst_time == 0)
 		{
 			completed++;
-			total_turnaround_time += (float)(clock - shortest->arrival);
+			unsigned long turnaround = clock - shortest->arrival;
+			total_turnaround_time += (float)turnaround;
+
+			unsigned long burst = original_bursts[shortest_index];
+			total_wait_time += (float)(turnaround - burst);
 		}
 	}
 
