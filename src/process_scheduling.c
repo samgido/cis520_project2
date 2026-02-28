@@ -29,6 +29,48 @@ static int compare_arrival_time(const void *a, const void *b)
 	return 0;
 }
 
+static int compare_remaining_burst_time(const void *a, const void *b)
+{
+	const ProcessControlBlock_t *pcb_a = (const ProcessControlBlock_t *)a;
+	const ProcessControlBlock_t *pcb_b = (const ProcessControlBlock_t *)b;
+
+	if (pcb_a->remaining_burst_time < pcb_b->remaining_burst_time) return -1;
+	if (pcb_a->remaining_burst_time > pcb_b->remaining_burst_time) return 1;
+	return 0;
+}
+
+static int compare_priority(const void *a, const void *b)
+{
+	const ProcessControlBlock_t *pcb_a = (const ProcessControlBlock_t *)a;
+	const ProcessControlBlock_t *pcb_b = (const ProcessControlBlock_t *)b;
+
+	if (pcb_a->priority < pcb_b->priority) return -1;
+	if (pcb_a->priority > pcb_b->priority) return 1;
+	return 0;
+}
+
+// If two processes have the same arrival, check their remaining burst time
+static int compare_arrival_with_burst_fallback(const void *a, const void*b) 
+{
+	const int arrival_comp = compare_arrival_time(a, b);
+
+	if (arrival_comp != 0)
+		return arrival_comp;
+
+	return compare_remaining_burst_time(a, b);
+}
+
+// If two processes have the same arrival, check their priority
+static int compare_arrival_with_priority_fallback(const void *a, const void*b) 
+{
+	const int arrival_comp = compare_arrival_time(a, b);
+
+	if (arrival_comp != 0)
+		return arrival_comp;
+
+	return compare_priority(a, b);
+}
+
 bool first_come_first_serve(dyn_array_t *ready_queue, ScheduleResult_t *result) 
 {
 	// Parameter validation
@@ -93,16 +135,160 @@ bool first_come_first_serve(dyn_array_t *ready_queue, ScheduleResult_t *result)
 
 bool shortest_job_first(dyn_array_t *ready_queue, ScheduleResult_t *result) 
 {
-	UNUSED(ready_queue);
-	UNUSED(result);
-	return false;
+	if (!ready_queue || !result)
+	{
+		return false;
+	}
+
+	size_t num_processes = dyn_array_size(ready_queue);
+	if (num_processes == 0)
+	{
+		return false;
+	}
+
+	unsigned long clock = 0;
+	float total_wait_time = 0;
+	float total_turnaround_time = 0;
+
+	size_t completed = 0;
+
+	dyn_array_sort(ready_queue, compare_remaining_burst_time);
+	while (completed < num_processes) 
+	{
+		ProcessControlBlock_t *pcb = NULL;
+
+		// In case no PCB have arrived, also keep track of 
+		// the soonest arrival
+		ProcessControlBlock_t *soonest_arrival = NULL;
+
+		// Search for an arrived process in the queue sorted by burst
+		for (size_t i = 0; i < dyn_array_size(ready_queue); ++i) 
+		{
+			ProcessControlBlock_t *p = (ProcessControlBlock_t *)dyn_array_at(ready_queue, i);
+			if (!p)
+			{
+				return false;
+			}
+
+			// If this process has arrived, extract remove it from the queue
+			// and stop searching
+			if (p->arrival <= clock && p->remaining_burst_time > 0)
+			{
+				pcb = p;
+				break;
+			}
+
+			if (!soonest_arrival || compare_arrival_with_burst_fallback(soonest_arrival, p) < 0)
+			{
+				soonest_arrival = p;
+			}
+		}
+
+		if (pcb == NULL) // No arrived PCBs, take the soonest arriving process
+		{
+			pcb = soonest_arrival;
+			clock = pcb->arrival;
+		}
+
+		unsigned long wait_time = clock - pcb->arrival;
+		total_wait_time += (float)wait_time;
+
+		pcb->started = true;
+		while (pcb->remaining_burst_time > 0)
+		{
+			virtual_cpu(pcb);
+			clock++;
+		}
+		completed++;
+
+		unsigned long turnaround_time = clock - pcb->arrival;
+		total_turnaround_time += (float)turnaround_time;
+	}
+
+	result->average_waiting_time = total_wait_time / (float)num_processes;
+	result->average_turnaround_time = total_turnaround_time / (float)num_processes;
+	result->total_run_time = clock;
+
+	return true;
 }
 
 bool priority(dyn_array_t *ready_queue, ScheduleResult_t *result) 
 {
-	UNUSED(ready_queue);
-	UNUSED(result);
-	return false;
+	if (!ready_queue || !result)
+	{
+		return false;
+	}
+
+	size_t num_processes = dyn_array_size(ready_queue);
+	if (num_processes == 0)
+	{
+		return false;
+	}
+
+	unsigned long clock = 0;
+	float total_wait_time = 0;
+	float total_turnaround_time = 0;
+
+	size_t completed = 0;
+
+	dyn_array_sort(ready_queue, compare_priority);
+	while (completed < num_processes) 
+	{
+		ProcessControlBlock_t *pcb = NULL;
+
+		// In case no PCB have arrived, also keep track of 
+		// the soonest arrival
+		ProcessControlBlock_t *soonest_arrival = NULL;
+
+		// Search for an arrived process in the queue sorted by priority
+		for (size_t i = 0; i < dyn_array_size(ready_queue); ++i) 
+		{
+			ProcessControlBlock_t *p = (ProcessControlBlock_t *)dyn_array_at(ready_queue, i);
+			if (!p)
+			{
+				return false;
+			}
+
+			// If this process has arrived, extract remove it from the queue
+			// and stop searching
+			if (p->arrival <= clock && p->remaining_burst_time > 0)
+			{
+				pcb = p;
+				break;
+			}
+
+			if (!soonest_arrival || compare_arrival_with_priority_fallback(soonest_arrival, p) < 0) 
+			{
+				soonest_arrival = p;
+			}
+		}
+
+		if (pcb == NULL) // No arrived PCBs, take the soonest arriving process
+		{
+			pcb = soonest_arrival;
+			clock = pcb->arrival;
+		}
+
+		unsigned long wait_time = clock - pcb->arrival;
+		total_wait_time += (float)wait_time;
+
+		pcb->started = true;
+		while (pcb->remaining_burst_time > 0)
+		{
+			virtual_cpu(pcb);
+			clock++;
+		}
+		completed++;
+
+		unsigned long turnaround_time = clock - pcb->arrival;
+		total_turnaround_time += (float)turnaround_time;
+	}
+
+	result->average_waiting_time = total_wait_time / (float)num_processes;
+	result->average_turnaround_time = total_turnaround_time / (float)num_processes;
+	result->total_run_time = clock;
+
+	return true;
 }
 
 bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quantum) 
@@ -315,6 +501,8 @@ bool shortest_remaining_time_first(dyn_array_t *ready_queue, ScheduleResult_t *r
 	result->average_turnaround_time = total_turnaround_time / (float)n;
 	result->total_run_time = clock;
 
+	free(original_bursts);
+		
 	return true;
 }
 

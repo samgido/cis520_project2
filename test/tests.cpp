@@ -196,6 +196,150 @@ TEST(round_robin, NullInputs)
 	dyn_array_destroy(ready_queue);
 }
 
+// SJF Test 1: Verify correct scheduling with same arrival times
+TEST(shortest_job_first, ValidProcessesSameArrivals)
+{
+	dyn_array_t *ready_queue = dyn_array_create(4, sizeof(ProcessControlBlock_t), NULL);
+	ASSERT_NE(ready_queue, nullptr);
+
+	ProcessControlBlock_t pcbs[4] = {
+		{10, 0, 0, false},
+		{5, 0, 0, false},
+		{1, 0, 0, false},
+		{15, 0, 0, false},
+	};
+
+	for (int i = 0; i < 4; ++i) 
+	{
+		dyn_array_push_back(ready_queue, &pcbs[i]);
+	}
+
+	ScheduleResult_t result;
+	bool success = shortest_job_first(ready_queue, &result);
+
+	ASSERT_EQ(success, true);
+	ASSERT_NEAR(result.average_waiting_time, 5.75f, 0.1f);
+	ASSERT_NEAR(result.average_turnaround_time, 13.5f, 0.1f);
+	ASSERT_EQ(result.total_run_time, (unsigned long)31);
+
+	dyn_array_destroy(ready_queue);
+}
+
+// SJF Test 1: Verify correct scheduling with varied arrival times
+TEST(shortest_job_first, ValidProcessesDifferentArrivals)
+{
+	dyn_array_t *ready_queue = dyn_array_create(5, sizeof(ProcessControlBlock_t), NULL);
+	ASSERT_NE(ready_queue, nullptr);
+
+	ProcessControlBlock_t pcbs[5] = {
+		{10, 0, 0, false},
+		{5, 0, 0, false},
+		{1, 0, 10, false},
+		{2, 0, 10, false},
+		{15, 0, 0, false}
+	};
+
+	for (int i = 0; i < 5; ++i) 
+		dyn_array_push_back(ready_queue, &pcbs[i]);
+
+	ScheduleResult_t result;
+	bool success = shortest_job_first(ready_queue, &result);
+
+	ASSERT_EQ(success, true);
+	ASSERT_NEAR(result.average_waiting_time, 6.8f, 0.1f);
+	ASSERT_NEAR(result.average_turnaround_time, 13.4f, 0.1f);
+	ASSERT_EQ(result.total_run_time, (unsigned long)33);
+
+	dyn_array_destroy(ready_queue);
+}
+
+// SJF Test 2: Verify NULL input handling
+TEST(shortest_job_first, NullInputs)
+{
+	ScheduleResult_t result;
+	dyn_array_t* ready_queue = dyn_array_create(2, sizeof(ProcessControlBlock_t), NULL);
+
+	ASSERT_EQ(shortest_job_first(NULL, NULL), false);
+	ASSERT_EQ(shortest_job_first(NULL, &result), false);
+	ASSERT_EQ(shortest_job_first(ready_queue, NULL), false);
+	ASSERT_EQ(shortest_job_first(ready_queue, &result), false);
+
+	dyn_array_destroy(ready_queue);
+}
+
+// Prio Test 1: Verify correct scheduling with same arrival times
+TEST(priority, ValidProcessesSameArrivals)
+{
+	dyn_array_t *ready_queue = dyn_array_create(4, sizeof(ProcessControlBlock_t), NULL);
+	ASSERT_NE(ready_queue, nullptr);
+
+	ProcessControlBlock_t pcbs[4] = {
+		{10, 1, 0, false},
+		{5, 2, 0, false},
+		{1, 3, 0, false},
+		{15, 4, 0, false},
+	};
+
+	for (int i = 0; i < 4; ++i) 
+	{
+		dyn_array_push_back(ready_queue, &pcbs[i]);
+	}
+
+	ScheduleResult_t result;
+	bool success = priority(ready_queue, &result);
+
+	ASSERT_EQ(success, true);
+	ASSERT_NEAR(result.average_waiting_time, 10.25f, 0.1f);
+	ASSERT_NEAR(result.average_turnaround_time, 18.0f, 0.1f);
+	ASSERT_EQ(result.total_run_time, (unsigned long)31);
+
+	dyn_array_destroy(ready_queue);
+}
+
+// Prio Test 2: Verify correct scheduling with different arrival times
+TEST(priority, ValidProcessesDifferentArrivals)
+{
+	dyn_array_t *ready_queue = dyn_array_create(5, sizeof(ProcessControlBlock_t), NULL);
+	ASSERT_NE(ready_queue, nullptr);
+
+	ProcessControlBlock_t pcbs[5] = {
+		{10, 1, 0, false},
+		{5, 2, 15, false},
+		{10, 1, 15, false},
+		{1, 3, 0, false},
+		{15, 4, 0, false},
+	};
+
+	for (int i = 0; i < 5; ++i) 
+	{
+		dyn_array_push_back(ready_queue, &pcbs[i]);
+	}
+
+	ScheduleResult_t result;
+	bool success = priority(ready_queue, &result);
+
+	ASSERT_EQ(success, true);
+	ASSERT_NEAR(result.average_waiting_time, 10.6f, 0.1f);
+	ASSERT_NEAR(result.average_turnaround_time, 18.8f, 0.1f);
+	ASSERT_EQ(result.total_run_time, (unsigned long)41);
+
+	dyn_array_destroy(ready_queue);
+}
+
+// Prio Test 3: Verify null input handling
+TEST(priority, NullInputs)
+{
+	ScheduleResult_t result;
+	dyn_array_t* ready_queue = dyn_array_create(2, sizeof(ProcessControlBlock_t), NULL);
+
+	ASSERT_EQ(priority(NULL, NULL), false);
+	ASSERT_EQ(priority(NULL, &result), false);
+	ASSERT_EQ(priority(ready_queue, NULL), false);
+	ASSERT_EQ(priority(ready_queue, &result), false);
+
+	dyn_array_destroy(ready_queue);
+}
+
 int main(int argc, char **argv)
 {
 	::testing::InitGoogleTest(&argc, argv);
